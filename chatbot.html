@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080d1d" />
+    <title>Flix AI</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #080c19;
+        --panel: rgba(15, 22, 42, 0.94);
+        --border: rgba(151, 174, 255, 0.17);
+        --cyan: #80f2ff;
+        --violet: #a98bff;
+        --green: #79e7b0;
+        --text: #f3f5ff;
+        --muted: #a7b0c9;
+      }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        padding: 28px;
+        display: grid;
+        place-items: center;
+        background: radial-gradient(ellipse at 12% 10%, rgba(90,129,255,.2), transparent 32%), radial-gradient(ellipse at 90% 90%, rgba(123,84,255,.2), transparent 30%), var(--bg);
+        color: var(--text);
+        font-family: "Segoe UI", Tahoma, sans-serif;
+      }
+      button, input { font: inherit; }
+      .app {
+        width: min(1040px, 100%);
+        min-height: min(760px, calc(100vh - 56px));
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        overflow: hidden;
+        border: 1px solid var(--border);
+        border-radius: 26px;
+        background: var(--panel);
+        box-shadow: 0 28px 90px rgba(0,0,0,.42), 0 0 55px rgba(128,112,255,.1);
+        backdrop-filter: blur(18px);
+      }
+      .chat-area { min-width: 0; display: flex; flex-direction: column; }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 20px 26px; border-bottom: 1px solid var(--border); }
+      .assistant-name { display: flex; align-items: center; gap: 13px; }
+      .avatar { width: 42px; height: 42px; border-radius: 15px; font-size: 20px; }
+      .assistant-name strong { display: block; font-size: .95rem; }
+      .online { display: flex; align-items: center; gap: 6px; margin-top: 4px; color: var(--green); font-size: .74rem; }
+      .online::before { width: 7px; height: 7px; border-radius: 50%; background: var(--green); content: ""; box-shadow: 0 0 10px var(--green); }
+      .conversation { flex: 1; min-height: 350px; overflow-y: auto; padding: 27px clamp(18px,5vw,52px) 20px; scroll-behavior: smooth; }
+      .date-label { margin: 0 0 24px; color: #78839f; text-align: center; font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; }
+      .message { display: flex; align-items: flex-start; gap: 11px; margin: 0 0 20px; animation: arrive .2s ease both; }
+      @keyframes arrive { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+      .message.user { justify-content: flex-end; }
+      .message .avatar { width: 31px; height: 31px; border-radius: 11px; font-size: 15px; }
+      .bubble { max-width: min(82%,560px); padding: 13px 16px; border: 1px solid var(--border); border-radius: 4px 16px 16px 16px; background: rgba(255,255,255,.045); color: #e2e6f4; font-size: .91rem; line-height: 1.65; white-space: pre-wrap; overflow-wrap: anywhere; }
+      .user .bubble { border-color: rgba(128,242,255,.2); border-radius: 16px 4px 16px 16px; background: linear-gradient(135deg,rgba(85,156,203,.19),rgba(132,106,207,.2)); }
+      .typing { display: flex; gap: 4px; align-items: center; height: 20px; }
+      .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--cyan); animation: pulse .8s infinite alternate; }
+      .typing i:nth-child(2) { animation-delay: .15s; }
+      .typing i:nth-child(3) { animation-delay: .3s; }
+      @keyframes pulse { to { opacity: .3; transform: translateY(-3px); } }
+      .suggestions { display: flex; flex-wrap: wrap; gap: 9px; margin: 2px 0 23px 42px; }
+      .suggestions button { padding: 9px 12px; border: 1px solid rgba(169,139,255,.28); border-radius: 999px; background: rgba(169,139,255,.06); color: #c6b8ff; cursor: pointer; font-size: .76rem; }
+      .suggestions button:hover { border-color: var(--violet); background: rgba(169,139,255,.13); }
+      .composer-wrap { padding: 0 clamp(18px,5vw,52px) 19px; }
+      .composer { display: flex; align-items: center; gap: 12px; padding: 8px 9px 8px 17px; border: 1px solid rgba(151,174,255,.24); border-radius: 16px; background: rgba(6,10,22,.74); }
+      .composer:focus-within { border-color: rgba(128,242,255,.55); box-shadow: 0 0 0 3px rgba(128,242,255,.07); }
+      .composer input { flex: 1; min-width: 0; padding: 9px 0; border: 0; outline: 0; background: transparent; color: var(--text); font-size: .9rem; }
+      .composer input::placeholder { color: #74809d; }
+      .voice-button { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.04); color: var(--muted); cursor: pointer; font-size: 1rem; }
+      .voice-button:hover, .voice-button[aria-pressed="true"] { border-color: rgba(128,242,255,.5); color: var(--cyan); background: rgba(128,242,255,.08); }
+      .voice-button:disabled { cursor: not-allowed; opacity: .45; }
+      .voice-button:focus-visible, .send:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+      .expression-preview { display: flex; align-items: center; gap: 12px; margin: 0 0 10px; padding: 10px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.025); }
+      .expression-preview video { width: 112px; aspect-ratio: 4 / 3; border-radius: 8px; background: #050812; object-fit: cover; transform: scaleX(-1); }
+      .expression-preview p { margin: 0; color: var(--muted); font-size: .75rem; line-height: 1.5; }
+      .send { display: grid; width: 40px; height: 40px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 12px; background: linear-gradient(135deg,var(--cyan),#a7c2ff 55%,var(--violet)); color: #10172a; cursor: pointer; font-size: 1.12rem; }
+      .send:disabled { cursor: wait; opacity: .6; }
+      .voice-status { min-height: 1em; margin: 7px 0 0; color: var(--muted); text-align: center; font-size: .72rem; }
+      .disclaimer { margin: 10px 0 0; color: #76819c; text-align: center; font-size: .69rem; }
+      @media (max-width: 720px) {
+        body { padding: 0; }
+        .app { min-height: 100vh; border: 0; border-radius: 0; }
+        .topbar { padding: 16px 18px; }
+        .conversation { padding: 22px 17px 16px; }
+        .composer-wrap { padding: 0 16px 15px; }
+        .suggestions { margin-left: 0; }
+      }
+      @media (max-width: 400px) { .expression-preview video { width: 88px; } }
+      @media (max-width: 400px) { .bubble { max-width: 88%; } }
+      @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; } }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <section class="chat-area" aria-label="AI chat">
+        <header class="topbar">
+          <div class="assistant-name"><span class="avatar" aria-hidden="true">✦</span><div><strong>Flix AI Assistant</strong><span class="online">Ready to chat</span></div></div>
+        </header>
+
+        <div class="conversation" id="conversation" role="log" aria-live="polite" aria-relevant="additions">
+          <p class="date-label">Your new conversation</p>
+          <div class="message assistant"><span class="avatar" aria-hidden="true">✦</span><div class="bubble" id="welcomeMessage">Hi there! 👋 I’m Flix AI. Ask me anything—or ask about this website.</div></div>
+          <div class="suggestions" id="suggestions" aria-label="Suggested questions">
+            <button type="button">Who is the president of India?</button>
+            <button type="button">Give me a simple recipe</button>
+          </div>
+        </div>
+
+        <div class="composer-wrap">
+          <div class="expression-preview" id="expressionPreview" hidden>
+            <video id="expressionVideo" autoplay muted playsinline aria-label="Local camera preview"></video>
+            <p id="expressionStatus" role="status" aria-live="polite">Camera frames are analyzed on this device. Only a possible expression label is shared with Flix when you send a message. Estimates can be wrong and cannot tell how you truly feel.</p>
+          </div>
+          <form class="composer" id="chatForm">
+            <input id="messageInput" type="text" autocomplete="off" maxlength="4000" placeholder="Message the assistant..." aria-label="Your message" />
+            <button class="voice-button" id="expressionButton" type="button" aria-label="Turn on optional expression estimate" title="Turn on optional expression estimate" aria-pressed="false">🙂</button>
+            <button class="voice-button" id="voiceInputButton" type="button" aria-label="Start voice input" title="Start voice input">🎙</button>
+            <button class="voice-button" id="voiceRepliesButton" type="button" aria-label="Turn on voice replies" aria-pressed="false" title="Turn on voice replies">🔊</button>
+            <button class="send" id="sendButton" type="submit" aria-label="Send message">➤</button>
+          </form>
+          <p class="voice-status" id="voiceStatus" role="status" aria-live="polite"></p>
+          <p class="disclaimer">AI can make mistakes. Avoid sharing passwords or sensitive personal information. Voice input may be processed by your browser’s speech service. Optional expression estimates are uncertain and never identify you.</p>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const conversation = document.getElementById('conversation');
+      const form = document.getElementById('chatForm');
+      const input = document.getElementById('messageInput');
+      const sendButton = document.getElementById('sendButton');
+      const voiceInputButton = document.getElementById('voiceInputButton');
+      const voiceRepliesButton = document.getElementById('voiceRepliesButton');
+      const expressionButton = document.getElementById('expressionButton');
+      const expressionPreview = document.getElementById('expressionPreview');
+      const expressionVideo = document.getElementById('expressionVideo');
+      const expressionStatus = document.getElementById('expressionStatus');
+      const voiceStatus = document.getElementById('voiceStatus');
+      const suggestions = document.getElementById('suggestions');
+      const chatHistory = [];
+      const userId = sessionStorage.getItem('flixAiUserId');
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      let recognition;
+      let listening = false;
+      let voiceRepliesEnabled = false;
+      let expressionStream;
+      let faceLandmarker;
+      let expressionTimer;
+      let expressionEnabled = false;
+      let expressionEstimate = null;
+
+      if (userId) {
+        document.getElementById('welcomeMessage').textContent = `Welcome, ${userId}! 👋 I’m Flix AI. Ask me anything—or ask about this website.`;
+      }
+
+      function addMessage(text, sender) {
+        const message = document.createElement('div');
+        message.className = `message ${sender}`;
+        if (sender === 'assistant') {
+          const avatar = document.createElement('span');
+          avatar.className = 'avatar';
+          avatar.setAttribute('aria-hidden', 'true');
+          avatar.textContent = '✦';
+          message.append(avatar);
+        }
+        const bubble = document.createElement('div');
+        bubble.className = 'bubble';
+        bubble.textContent = text;
+        message.append(bubble);
+        conversation.append(message);
+        conversation.scrollTop = conversation.scrollHeight;
+      }
+
+      function speakReply(text) {
+        if (!voiceRepliesEnabled || !('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const speechText = text
+          .replace(/```[\w-]*\s*([\s\S]*?)```/g, '$1')
+          .replace(/`([^`]+)`/g, '$1')
+          .replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1')
+          .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+          .replace(/^\s{0,3}#{1,6}\s*/gm, '')
+          .replace(/^\s*>\s?/gm, '')
+          .replace(/^\s*[-*+]\s+/gm, '')
+          .replace(/^\s*\d+[.)]\s+/gm, '')
+          .replace(/(\*\*|__|\*|_|~~)/g, '')
+          .replace(/[|]/g, ' ')
+          .replace(/[ \t]+/g, ' ')
+          .trim();
+        if (!speechText) return;
+        const utterance = new SpeechSynthesisUtterance(speechText);
+        utterance.lang = navigator.language || document.documentElement.lang || 'en-US';
+        utterance.rate = 0.9;
+        utterance.pitch = 1;
+        utterance.volume = 1;
+        const language = utterance.lang.toLowerCase();
+        const voices = window.speechSynthesis.getVoices();
+        utterance.voice =
+          voices.find((voice) => voice.lang.toLowerCase() === language && voice.default) ||
+          voices.find((voice) => voice.lang.toLowerCase() === language) ||
+          voices.find((voice) => voice.lang.toLowerCase().startsWith(`${language.split('-')[0]}-`));
+        window.speechSynthesis.speak(utterance);
+      }
+
+      if (SpeechRecognition) {
+        recognition = new SpeechRecognition();
+        recognition.lang = navigator.language || 'en-US';
+        recognition.continuous = false;
+        recognition.interimResults = false;
+        recognition.onresult = (event) => {
+          const transcript = event.results[0][0].transcript.trim();
+          if (transcript) {
+            input.value = transcript.slice(0, 4000);
+            voiceStatus.textContent = 'Transcript ready. Review it and press send.';
+          }
+        };
+        recognition.onerror = (event) => {
+          const messages = {
+            'not-allowed': 'Microphone access was denied. Allow microphone access in your browser settings to use voice input.',
+            'service-not-allowed': 'Voice input is blocked by the browser.',
+            'no-speech': 'No speech was detected. Try again.',
+            'audio-capture': 'No microphone was found. Check your microphone and try again.'
+          };
+          voiceStatus.textContent = messages[event.error] || 'Voice input could not start. Please try again.';
+        };
+        recognition.onend = () => {
+          listening = false;
+          voiceInputButton.setAttribute('aria-pressed', 'false');
+          voiceInputButton.setAttribute('aria-label', 'Start voice input');
+          voiceInputButton.title = 'Start voice input';
+          if (voiceStatus.textContent === 'Listening…') {
+            voiceStatus.textContent = 'Voice input stopped.';
+          }
+        };
+      } else {
+        voiceInputButton.disabled = true;
+        voiceInputButton.title = 'Voice input is not supported by this browser';
+        voiceStatus.textContent = 'Voice input is not supported by this browser.';
+      }
+
+      voiceInputButton.addEventListener('click', () => {
+        if (!recognition) return;
+        if (listening) {
+          recognition.stop();
+          return;
+        }
+        try {
+          voiceStatus.textContent = 'Listening…';
+          recognition.start();
+          listening = true;
+          voiceInputButton.setAttribute('aria-pressed', 'true');
+          voiceInputButton.setAttribute('aria-label', 'Stop voice input');
+          voiceInputButton.title = 'Stop voice input';
+        } catch (error) {
+          voiceStatus.textContent = 'Voice input could not start. Please try again.';
+          console.error('Voice input failed to start:', error);
+        }
+      });
+
+      voiceRepliesButton.disabled = !('speechSynthesis' in window);
+      if (!('speechSynthesis' in window)) {
+        voiceRepliesButton.title = 'Voice replies are not supported by this browser';
+      }
+      voiceRepliesButton.addEventListener('click', () => {
+        voiceRepliesEnabled = !voiceRepliesEnabled;
+        voiceRepliesButton.setAttribute('aria-pressed', String(voiceRepliesEnabled));
+        voiceRepliesButton.setAttribute('aria-label', voiceRepliesEnabled ? 'Turn off voice replies' : 'Turn on voice replies');
+        voiceRepliesButton.title = voiceRepliesEnabled ? 'Turn off voice replies' : 'Turn on voice replies';
+        if (!voiceRepliesEnabled) {
+          window.speechSynthesis.cancel();
+          voiceStatus.textContent = 'Voice replies turned off.';
+        } else {
+          voiceStatus.textContent = 'Voice replies turned on.';
+        }
+      });
+
+      function stopExpressionDetection() {
+        expressionEnabled = false;
+        window.clearTimeout(expressionTimer);
+        expressionTimer = undefined;
+        if (expressionStream) {
+          expressionStream.getTracks().forEach((track) => track.stop());
+          expressionStream = undefined;
+        }
+        expressionVideo.pause();
+        expressionVideo.srcObject = null;
+        expressionPreview.hidden = true;
+        faceLandmarker?.close();
+        faceLandmarker = undefined;
+        expressionEstimate = null;
+        expressionButton.setAttribute('aria-pressed', 'false');
+        expressionButton.setAttribute('aria-label', 'Turn on optional expression estimate');
+        expressionButton.title = 'Turn on optional expression estimate';
+      }
+
+      function updateExpressionEstimate(result) {
+        const categories = result.faceBlendshapes?.[0]?.categories;
+        if (!categories) {
+          expressionEstimate = null;
+          expressionStatus.textContent = 'No face detected. Camera frames stay on this device; no expression estimate is being shared.';
+          return;
+        }
+
+        const scores = new Map(categories.map(({ categoryName, score }) => [categoryName, score]));
+        const smile = ((scores.get('mouthSmileLeft') || 0) + (scores.get('mouthSmileRight') || 0)) / 2;
+        const frown = ((scores.get('mouthFrownLeft') || 0) + (scores.get('mouthFrownRight') || 0)) / 2;
+        const innerBrowUp = scores.get('browInnerUp') || 0;
+        const browDown = ((scores.get('browDownLeft') || 0) + (scores.get('browDownRight') || 0)) / 2;
+        const eyeSquint = ((scores.get('eyeSquintLeft') || 0) + (scores.get('eyeSquintRight') || 0)) / 2;
+        const noseSneer = ((scores.get('noseSneerLeft') || 0) + (scores.get('noseSneerRight') || 0)) / 2;
+        const eyeWide = ((scores.get('eyeWideLeft') || 0) + (scores.get('eyeWideRight') || 0)) / 2;
+        const mouthPress = ((scores.get('mouthPressLeft') || 0) + (scores.get('mouthPressRight') || 0)) / 2;
+
+        if (browDown >= 0.45 && (eyeSquint >= 0.25 || noseSneer >= 0.2)) {
+          expressionEstimate = 'angry';
+          expressionStatus.textContent = 'Your expression may look angry. Facial cues cannot tell how you truly feel, and this estimate can be wrong.';
+        } else if (smile >= 0.55 && smile > frown + 0.15) {
+          expressionEstimate = 'happy';
+          expressionStatus.textContent = 'Your expression may look happy. This is only a rough estimate; it can be wrong.';
+        } else if (frown >= 0.4 && innerBrowUp >= 0.2) {
+          expressionEstimate = 'sad';
+          expressionStatus.textContent = 'Your expression may look sad. This is only a rough estimate; it can be wrong.';
+        } else if (innerBrowUp >= 0.35 && (eyeWide >= 0.35 || mouthPress >= 0.3)) {
+          expressionEstimate = 'nervous';
+          expressionStatus.textContent = 'Your expression may show tension, but a face cannot reliably reveal nervousness or how you feel.';
+        } else {
+          expressionEstimate = null;
+          expressionStatus.textContent = 'No clear expression detected. These estimates can be wrong and cannot tell how you truly feel.';
+        }
+      }
+
+      function detectExpression() {
+        if (!expressionEnabled || !faceLandmarker) return;
+        try {
+          if (expressionVideo.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            updateExpressionEstimate(faceLandmarker.detectForVideo(expressionVideo, performance.now()));
+          }
+          expressionTimer = window.setTimeout(detectExpression, 600);
+        } catch (error) {
+          console.error('Facial-expression estimation failed:', error);
+          stopExpressionDetection();
+          voiceStatus.textContent = 'Expression estimation stopped because the local model encountered an error.';
+        }
+      }
+
+      expressionButton.addEventListener('click', async () => {
+        if (expressionStream) {
+          stopExpressionDetection();
+          voiceStatus.textContent = 'Optional expression estimate turned off. Camera stopped.';
+          return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia) {
+          voiceStatus.textContent = 'Camera access is unavailable. Open this page on localhost or HTTPS and use a supported browser.';
+          return;
+        }
+
+        expressionButton.disabled = true;
+        voiceStatus.textContent = 'Requesting camera access…';
+        let stream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' }, audio: false });
+          expressionStream = stream;
+          expressionVideo.srcObject = stream;
+          expressionPreview.hidden = false;
+          await expressionVideo.play();
+          expressionStatus.textContent = 'Loading the expression model. Camera frames are processed only on this device…';
+
+          const { FaceLandmarker, FilesetResolver } = await import(
+            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/vision_bundle.mjs'
+          );
+          const vision = await FilesetResolver.forVisionTasks(
+            'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.1.1/wasm'
+          );
+          faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
+            baseOptions: {
+              modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task'
+            },
+            runningMode: 'VIDEO',
+            numFaces: 1,
+            outputFaceBlendshapes: true
+          });
+          expressionEnabled = true;
+          expressionButton.setAttribute('aria-pressed', 'true');
+          expressionButton.setAttribute('aria-label', 'Turn off optional expression estimate');
+          expressionButton.title = 'Turn off optional expression estimate';
+          voiceStatus.textContent = 'Optional expression estimate is on. Only a possible expression label is sent with your messages.';
+          detectExpression();
+        } catch (error) {
+          stream?.getTracks().forEach((track) => track.stop());
+          stopExpressionDetection();
+          console.error('Could not start optional expression estimation:', error);
+          const permissionDenied = error?.name === 'NotAllowedError' || error?.name === 'PermissionDeniedError';
+          const cameraMissing = error?.name === 'NotFoundError' || error?.name === 'DevicesNotFoundError';
+          voiceStatus.textContent = permissionDenied
+            ? 'Camera access was denied. Allow it in your browser settings if you want to enable expression estimates.'
+            : cameraMissing
+              ? 'No camera was found. Connect a camera and try again.'
+              : 'Expression estimation could not start. Check your connection and browser permissions, then try again.';
+        } finally {
+          expressionButton.disabled = false;
+        }
+      });
+
+      window.addEventListener('pagehide', stopExpressionDetection);
+
+      async function getReply(text) {
+        chatHistory.push({ role: 'user', content: text });
+        if (/^(hi|hello|hey)$/i.test(text.trim())) {
+          const reply = 'Hello! 👋';
+          chatHistory.push({ role: 'assistant', content: reply });
+          if (chatHistory.length > 20) chatHistory.splice(0, chatHistory.length - 20);
+          return reply;
+        }
+        try {
+          const response = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              message: text,
+              expressionEstimate: expressionEnabled ? expressionEstimate : null,
+              history: chatHistory.slice(-16, -1).map(({ role, content }) => ({
+                role: role === 'assistant' ? 'model' : role,
+                content
+              }))
+            })
+          });
+          let data;
+          try {
+            data = await response.json();
+          } catch {
+            throw new Error('The assistant is temporarily unavailable. Please try again.');
+          }
+          if (!response.ok) throw new Error(data.error || 'The assistant is temporarily unavailable. Please try again.');
+          if (typeof data.reply !== 'string' || !data.reply.trim()) throw new Error('The assistant returned an empty reply.');
+          chatHistory.push({ role: 'assistant', content: data.reply });
+          if (chatHistory.length > 20) chatHistory.splice(0, chatHistory.length - 20);
+          return data.reply;
+        } catch (error) {
+          chatHistory.pop();
+          throw error;
+        }
+      }
+
+      async function submitMessage(text) {
+        const trimmed = text.trim();
+        if (!trimmed || sendButton.disabled) return;
+        addMessage(trimmed, 'user');
+        suggestions.hidden = true;
+        input.value = '';
+        if (listening) recognition.stop();
+        sendButton.disabled = true;
+
+        const typingMessage = document.createElement('div');
+        typingMessage.className = 'message assistant';
+        typingMessage.setAttribute('aria-label', 'Assistant is typing');
+        typingMessage.innerHTML = '<span class="avatar" aria-hidden="true">✦</span><div class="bubble"><span class="typing" aria-hidden="true"><i></i><i></i><i></i></span></div>';
+        conversation.append(typingMessage);
+        conversation.scrollTop = conversation.scrollHeight;
+
+        try {
+          const reply = await getReply(trimmed);
+          typingMessage.remove();
+          addMessage(reply, 'assistant');
+          speakReply(reply);
+        } catch (error) {
+          typingMessage.remove();
+          const errorMessage = window.location.protocol === 'file:'
+            ? 'Start the server with npm start, then open http://localhost:3000/chatbot.html to chat.'
+            : error.message || 'The assistant is temporarily unavailable. Please try again.';
+          addMessage(errorMessage, 'assistant');
+        } finally {
+          sendButton.disabled = false;
+          input.focus();
+        }
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        submitMessage(input.value);
+      });
+
+      suggestions.addEventListener('click', (event) => {
+        if (event.target instanceof HTMLButtonElement) submitMessage(event.target.textContent);
+      });
+    </script>
+  </body>
+</html>
